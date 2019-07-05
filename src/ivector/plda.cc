@@ -283,6 +283,74 @@ void Plda::ApplyTransform(const Matrix<double> &in_transform) {
   ComputeDerivedVars();
 }
 
+void Plda::Interpolation(const Plda* ood, double weight_b, double weight_w) {
+  SpMatrix<double> between_var(Dim()),
+                   within_var(Dim()),
+                   psi_mat(Dim()),
+                   between_var_ood(Dim()),
+                   within_var_ood(Dim()),
+                   psi_mat_ood(Dim()),
+                   between_var_new(Dim()),
+                   within_var_new(Dim());
+  Matrix<double> transform_invert(transform_),
+                 transform_ood_invert(ood->transform_);
+
+  // Next, compute the between_var and within_var that existed
+  // prior to diagonalization.
+  psi_mat.AddDiagVec(1.0, psi_);
+  transform_invert.Invert();
+  within_var.AddMat2(1.0, transform_invert, kNoTrans, 0.0);
+  between_var.AddMat2Sp(1.0, transform_invert, kNoTrans, psi_mat, 0.0);
+
+  psi_mat_ood.AddDiagVec(1.0, ood->psi_);
+  transform_ood_invert.Invert();
+  within_var_ood.AddMat2(1.0, transform_ood_invert, kNoTrans, 0.0);
+  between_var_ood.AddMat2Sp(1.0, transform_ood_invert, kNoTrans, psi_mat_ood, 0.0);
+
+  // interpolation
+  between_var.Scale(weight_b);
+  between_var.AddSp(1-weight_b, between_var_ood);
+  within_var.Scale(weight_w);
+  within_var.AddSp(1-weight_w, within_var_ood);
+
+  // Finally, we need to recompute psi_ and transform_. The remainder of
+  // the code in this function  is a lightly modified copy of
+  // PldaEstimator::GetOutput().
+  Matrix<double> transform1(Dim(), Dim());
+  ComputeNormalizingTransform(within_var, &transform1);
+  // Now transform is a matrix that if we project with it,
+  // within_var becomes unit.
+  // between_var_proj is between_var after projecting with transform1.
+  SpMatrix<double> between_var_proj(Dim());
+  between_var_proj.AddMat2Sp(1.0, transform1, kNoTrans, between_var, 0.0);
+
+  Matrix<double> U(Dim(), Dim());
+  Vector<double> s(Dim());
+  // Do symmetric eigenvalue decomposition between_var_proj = U diag(s) U^T,
+  // where U is orthogonal.
+  between_var_proj.Eig(&s, &U);
+
+  KALDI_ASSERT(s.Min() >= 0.0);
+  int32 n;
+  s.ApplyFloor(0.0, &n);
+  if (n > 0) {
+    KALDI_WARN << "Floored " << n << " eigenvalues of between-class "
+               << "variance to zero.";
+  }
+  // Sort from greatest to smallest eigenvalue.
+  SortSvd(&s, &U);
+
+  // The transform U^T will make between_var_proj diagonal with value s
+  // (i.e. U^T U diag(s) U U^T = diag(s)).  The final transform that
+  // makes within_var unit and between_var diagonal is U^T transform1,
+  // i.e. first transform1 and then U^T.
+  transform_.Resize(Dim(), Dim());
+  transform_.AddMatMat(1.0, U, kTrans, transform1, kNoTrans, 0.0);
+  psi_.Resize(Dim());
+  psi_.CopyFromVec(s);
+  ComputeDerivedVars();
+}
+
 void PldaStats::AddSamples(double weight,
                            const Matrix<double> &group) {
   if (dim_ == 0) {
