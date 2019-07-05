@@ -36,9 +36,11 @@ int main(int argc, char *argv[]) {
     ParseOptions po(usage);
 
     bool binary = true;
+    double weight_mu      = 0.5;
     double weight_between = 0.5;
     double weight_within  = 0.5;
     po.Register("binary", &binary, "Write output in binary mode");
+    po.Register("weight_m", &weight_mu, "weight of mean for plda-in1");
     po.Register("weight_b", &weight_between, "weight of between-class covariance for plda-in1");
     po.Register("weight_w", &weight_within, "weight of within-class covariance for plda-in1");
 
@@ -59,7 +61,7 @@ int main(int argc, char *argv[]) {
     ReadKaldiObject(plda1_rxfilename, &plda1);
     ReadKaldiObject(plda2_rxfilename, &plda2);
 
-    plda1.Interpolation(&plda2, weight_between, weight_within);
+    plda1.Interpolation(&plda2, weight_mu, weight_between, weight_within);
 
     WriteKaldiObject(plda1, plda_wxfilename, binary);
 

@@ -138,7 +138,7 @@ class Plda {
   void ApplyTransform(const Matrix<double> &in_transform);
 
   // Interpolation: w_b * Bin + (1-w_b) * Bout, w_w * Win + (1-w_w) * Wout
-  void Interpolation(const Plda* ood, double weight_b, double weight_w); 
+  void Interpolation(const Plda* ood, double weight_m, double weight_b, double weight_w); 
   
   int32 Dim() const { return mean_.Dim(); }
   void Write(std::ostream &os, bool binary) const;

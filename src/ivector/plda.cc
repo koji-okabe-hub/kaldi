@@ -283,7 +283,7 @@ void Plda::ApplyTransform(const Matrix<double> &in_transform) {
   ComputeDerivedVars();
 }
 
-void Plda::Interpolation(const Plda* ood, double weight_b, double weight_w) {
+void Plda::Interpolation(const Plda* ood, double weight_m, double weight_b, double weight_w) {
   SpMatrix<double> between_var(Dim()),
                    within_var(Dim()),
                    psi_mat(Dim()),
@@ -308,6 +308,8 @@ void Plda::Interpolation(const Plda* ood, double weight_b, double weight_w) {
   between_var_ood.AddMat2Sp(1.0, transform_ood_invert, kNoTrans, psi_mat_ood, 0.0);
 
   // interpolation
+  mean_.Scale(weight_m);
+  mean_.AddVec(1-weight_m, ood->mean_);
   between_var.Scale(weight_b);
   between_var.AddSp(1-weight_b, between_var_ood);
   within_var.Scale(weight_w);
